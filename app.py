@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import graphviz
 
 # ตั้งค่า Streamlit page
@@ -79,7 +80,17 @@ elif menu_choice == "แบบทดสอบเลือกการตัด�
             col1, col2 = st.columns([2, 3])
             with col1:
                 st.markdown("### 🗺️ ตารางสรุป")
-                st.dataframe(df_results.style.background_gradient(cmap="YlOrRd"))
+                # ใช้ Plotly Table แทน .style
+                fig_table = go.Figure(data=[go.Table(
+                    header=dict(values=list(df_results.columns),
+                                fill_color='paleturquoise',
+                                align='left'),
+                    cells=dict(values=[df_results[col] for col in df_results.columns],
+                               fill_color='lavender',
+                               align='left'))
+                ])
+                st.plotly_chart(fig_table, use_container_width=True)
+
             with col2:
                 st.markdown("### 📊 จำนวนวันท่องเที่ยว")
                 fig = px.bar(
