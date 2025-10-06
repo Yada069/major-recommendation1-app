@@ -31,7 +31,6 @@ elif menu_choice == "แบบทดสอบเลือกการตัด�
         "2. คุณชอบบรรยากาศแบบไหน", 
         ["ทะเล", "ภูเขา", "วัฒนธรรม", "ยอดนิยม", "ธรรมชาติ"], key="prefer"
     )
-    season = st.sidebar.radio("3. ช่วงเวลาเดินทาง", ["หน้าร้อน", "หน้าหนาว", "หน้าฝน"], key="season")
 
     # กำหนดงบเป็นตัวเลข
     if budget_choice == "ต่ำ (<5000)":
@@ -54,19 +53,22 @@ elif menu_choice == "แบบทดสอบเลือกการตัด�
         {"จังหวัด": "กรุงเทพฯ", "สถานที่": "ถนนข้าวสาร", "ประเภท": "ยอดนิยม", "ค่าใช้จ่ายต่อวัน": 2000},
     ]
 
+    # --- เลือกสถานที่ที่อยากเที่ยวหลายแห่ง ---
+    filtered_destinations = [d for d in destinations if d["ประเภท"] == prefer]
+    location_options = [d["สถานที่"] for d in filtered_destinations]
+    selected_locations = st.sidebar.multiselect(
+        "3. เลือกสถานที่ที่อยากเที่ยว (เลือกได้หลายแห่ง)", location_options
+    )
+
     if st.sidebar.button("🎯 แสดงผลการแนะนำ"):
-        # กรองข้อมูลตามความชอบ
-        filtered = [d for d in destinations if d["ประเภท"] == prefer]
-
-        if not filtered:
-            st.warning("❌ ไม่มีข้อมูลที่ตรงกับความชอบของคุณ")
+        if not selected_locations:
+            st.warning("❌ โปรดเลือกสถานที่อย่างน้อย 1 แห่ง")
         else:
-            st.success(f"✨ ผลลัพธ์สำหรับงบประมาณ {budget:,} บาท และความชอบ '{prefer}'")
-
+            # รวมข้อมูลสถานที่ที่เลือก
             results = []
-            for d in filtered:
-                max_days = budget // d["ค่าใช้จ่ายต่อวัน"]
-                if max_days > 0:
+            for d in filtered_destinations:
+                if d["สถานที่"] in selected_locations:
+                    max_days = budget // d["ค่าใช้จ่ายต่อวัน"]
                     results.append({
                         "จังหวัด": d["จังหวัด"],
                         "สถานที่": d["สถานที่"],
@@ -76,11 +78,17 @@ elif menu_choice == "แบบทดสอบเลือกการตัด�
 
             df_results = pd.DataFrame(results)
 
-            # แสดงผลแบบคอลัมน์ 2 ฝั่ง
+            # --- แนะนำสถานที่เพิ่มเติมในจังหวัดเดียวกัน ---
+            selected_provinces = df_results["จังหวัด"].unique()
+            extra_recommendations = [
+                d for d in filtered_destinations
+                if d["จังหวัด"] in selected_provinces and d["สถานที่"] not in selected_locations
+            ]
+            df_extra = pd.DataFrame(extra_recommendations)
+
             col1, col2 = st.columns([2, 3])
             with col1:
                 st.markdown("### 🗺️ ตารางสรุป")
-                # ใช้ Plotly Table แทน .style
                 fig_table = go.Figure(data=[go.Table(
                     header=dict(values=list(df_results.columns),
                                 fill_color='paleturquoise',
@@ -90,6 +98,18 @@ elif menu_choice == "แบบทดสอบเลือกการตัด�
                                align='left'))
                 ])
                 st.plotly_chart(fig_table, use_container_width=True)
+
+                if not df_extra.empty:
+                    st.markdown("### 🌟 แนะนำสถานที่เพิ่มเติมในจังหวัดเดียวกัน")
+                    fig_extra = go.Figure(data=[go.Table(
+                        header=dict(values=list(df_extra.keys()),
+                                    fill_color='lightgreen',
+                                    align='left'),
+                        cells=dict(values=[df_extra[col] for col in df_extra.columns],
+                                   fill_color='honeydew',
+                                   align='left'))
+                    ])
+                    st.plotly_chart(fig_extra, use_container_width=True)
 
             with col2:
                 st.markdown("### 📊 จำนวนวันท่องเที่ยว")
@@ -114,7 +134,7 @@ elif menu_choice == "แบบทดสอบเลือกการตัด�
             dot.attr(bgcolor='#FFF7F0')
             dot.node("A", f"💰 งบประมาณ\n({budget_choice})", style='filled', color='#FFCCCB')
             dot.node("B", f"💖 ความชอบ\n({prefer})", style='filled', color='#FFD580')
-            dot.node("C", f"🗓️ ฤดูกาล\n({season})", style='filled', color='#A0E7E5')
+            dot.node("C", f"📍 สถานที่เลือก\n({', '.join(selected_locations)})", style='filled', color='#A0E7E5')
             dot.node("D", f"🏝️ ผลลัพธ์: {len(df_results)} สถานที่", style='filled', color='#B4F8C8')
             dot.edges(["AB", "BC", "CD"])
             st.graphviz_chart(dot)
